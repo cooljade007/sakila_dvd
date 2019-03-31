@@ -1,0 +1,94 @@
+
+/*Query#1- What are the top categories that brought in the most revenue? (Not including late fees)*/
+
+SELECT  c.name,
+        SUM(f.rental_rate) as tot_amount
+FROM category c
+JOIN film_category fc
+ON c.category_id=fc.category_id
+JOIN film f
+ON f.film_id=fc.film_id
+JOIN inventory i
+ON f.film_id=i.film_id
+JOIN rental r
+ON i.inventory_id=r.inventory_id
+GROUP BY 1
+ORDER BY 2 DESC
+LIMIT 5
+;
+
+/*Query#2- For the top 2 customers who have rented the most dvds, how many of each categories did they rent dvd from?*/
+
+WITH top2 AS (SELECT c.customer_id,
+                     c.first_name || ' ' || c.last_name AS Full_Name,
+                     COUNT(*) AS num_dvd_rented
+              FROM customer c
+              JOIN rental r
+              ON c.customer_id=r.customer_id
+              GROUP BY 1
+              ORDER BY 3 DESC
+              LIMIT 2)
+
+SELECT top2.Full_Name,
+       cat.name,
+       RANK() OVER(PARTITION BY top2.Full_Name ORDER BY COUNT(r.rental_id) DESC) AS CAT_Rank,
+       COUNT(rental_id) as num_dvd_rented
+FROM top2
+JOIN rental r
+ON top2.customer_id= r.customer_id
+JOIN inventory i
+ON r.inventory_id=i.inventory_id
+JOIN film_category fc
+ON i.film_id=fc.film_id
+JOIN category cat
+ON fc.category_id=cat.category_id
+GROUP BY 1,2
+ORDER BY 1, 3;
+
+/*Query#3- Which first adjective under the film's title description, generated the most revenue per film? (Not including late fees)*/
+
+WITH adj AS (SELECT film_id,
+                    description,
+                    rental_rate,
+                    SUBSTR(description, 3, STRPOS(SUBSTR(description, 3, LENGTH(description)-2), ' ')-1) As first_adj
+             FROM film),
+
+    adj_count AS (SELECT first_adj,
+                         COUNT(*) as num_films_adj
+                  FROM adj
+                  GROUP BY 1
+                  ORDER BY 1)
+
+SELECT adj.first_adj AS Adj_Description,
+       adj_count.num_films_adj,
+       SUM(adj.rental_rate) As tot_revenue,
+       ROUND(SUM(adj.rental_rate)/adj_count.num_films_adj,2) AS Rev_Per_Count
+FROM adj_count
+JOIN Adj
+ON adj_count.first_adj=adj.first_adj
+JOIN inventory i
+ON i.film_id=adj.film_id
+JOIN rental r
+ON i.inventory_id=r.inventory_id
+GROUP BY 1,2
+ORDER BY 4 DESC
+
+
+/*Query#4- How much of the total payments received are due to the late fees?*/
+
+WITH sub AS (SELECT r.customer_id,
+                    f.title, p.amount AS amount_paid,
+                    p.amount- f.rental_rate AS Late_fee
+            FROM film f
+            JOIN inventory i
+            ON f.film_id=i.film_id
+            JOIN rental r
+            ON i.inventory_id=r.inventory_id
+            JOIN payment p
+            ON r.rental_id=p.rental_id
+            JOIN customer c
+            ON p.customer_id=c.customer_id)
+
+SELECT SUM(amount_paid) AS Total_Paid,
+       SUM(Late_fee) AS Total_Late_Fee
+FROM sub
