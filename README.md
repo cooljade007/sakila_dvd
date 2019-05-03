@@ -30,7 +30,7 @@ The Sakila Movie Database is a fictional database that represents the business p
 
 <img src='img/query2.jpg'>
 
-<img src='img/slide1.jpg'>
+<img src='img/slide2.jpg'>
 
 ## QUESTION \#3
 
